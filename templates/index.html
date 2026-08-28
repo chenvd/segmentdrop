@@ -4,13 +4,19 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#050806">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>SegmentDrop · Emby → TheIntroDB</title>
+  <link rel="manifest" href="/static/manifest.webmanifest">
+  <link rel="icon" href="/static/favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/static/icons/favicon-16.png">
+  <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
   <link rel="stylesheet" href="/static/app.css">
 </head>
 <body>
   <div class="noise"></div>
   <svg width="0" height="0" aria-hidden="true" class="symbols">
-    <symbol id="icon-cut" viewBox="0 0 24 24"><path d="M7 4v16M17 4v16M4 8h6M14 16h6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
     <symbol id="icon-home" viewBox="0 0 24 24"><path d="m4 10 8-6 8 6v9a1 1 0 0 1-1 1h-5v-6h-4v6H5a1 1 0 0 1-1-1z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
     <symbol id="icon-settings" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M19 13.5v-3l-2-.7a7 7 0 0 0-.7-1.7l.9-1.9-2.1-2.1-1.9.9a7 7 0 0 0-1.7-.7L10.5 2h-3l-.7 2.3a7 7 0 0 0-1.7.7l-1.9-.9-2.1 2.1.9 1.9a7 7 0 0 0-.7 1.7l-2 .7v3l2 .7a7 7 0 0 0 .7 1.7l-.9 1.9 2.1 2.1 1.9-.9a7 7 0 0 0 1.7.7l.7 2.3h3l.7-2.3a7 7 0 0 0 1.7-.7l1.9.9 2.1-2.1-.9-1.9a7 7 0 0 0 .7-1.7z" transform="translate(2 0) scale(.83)" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
     <symbol id="icon-arrow" viewBox="0 0 24 24"><path d="m14 5-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
@@ -18,7 +24,7 @@
 
   <main class="shell">
     <header class="topbar">
-      <button class="brand" data-view="home" aria-label="返回正在播放"><span class="brand-mark"><svg><use href="#icon-cut"></use></svg></span><span class="brand-name">Segment<span>Drop</span></span></button>
+      <button class="brand" data-view="home" aria-label="返回正在播放"><span class="brand-mark"><img src="/static/icons/icon-192.png" alt="" width="30" height="30"></span><span class="brand-name">Segment<span>Drop</span></span></button>
       <nav class="nav-actions" aria-label="主导航">
         <button class="nav-btn active" data-view="home"><svg><use href="#icon-home"></use></svg><span>正在播放</span></button>
         <button class="nav-btn" data-view="settings"><svg><use href="#icon-settings"></use></svg><span>设置</span></button>
@@ -79,4 +85,3 @@
   <script src="/static/app.js" defer></script>
 </body>
 </html>
-

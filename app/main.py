@@ -60,6 +60,15 @@ async def index() -> FileResponse:
     return FileResponse(ROOT / "templates" / "index.html")
 
 
+@app.get("/sw.js", include_in_schema=False)
+async def service_worker() -> FileResponse:
+    return FileResponse(
+        ROOT / "static" / "sw.js",
+        media_type="application/javascript",
+        headers={"Cache-Control": "no-cache", "Service-Worker-Allowed": "/"},
+    )
+
+
 @app.get("/healthz")
 async def healthz() -> dict[str, str]:
     return {"status": "ok"}

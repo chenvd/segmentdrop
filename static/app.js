@@ -425,6 +425,8 @@ function pad(value) { return String(value ?? 0).padStart(2, "0"); }
 function clone(value) { return JSON.parse(JSON.stringify(value)); }
 
 document.addEventListener("visibilitychange", () => { if (!document.hidden && state.view === "home") refreshSessions(); });
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => navigator.serviceWorker.register("/sw.js").catch(() => {}));
+}
 setInterval(refreshSessions, 3000);
 refreshSessions();
-

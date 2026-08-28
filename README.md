@@ -14,6 +14,8 @@ python3.13 -m venv .venv
 
 打开 <http://127.0.0.1:8000>，先在“设置”中填写 Emby 与 TheIntroDB 信息。
 
+页面已包含 Web App Manifest、桌面图标和 Service Worker。在 HTTPS（或本机 localhost）访问时，可以从手机浏览器添加到主屏幕，以独立应用方式打开。
+
 ## Docker
 
 ```bash
