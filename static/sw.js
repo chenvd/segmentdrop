@@ -1,4 +1,4 @@
-const CACHE_NAME = "segmentdrop-shell-v2";
+const CACHE_NAME = "segmentdrop-shell-v3";
 const APP_SHELL = [
   "/",
   "/static/app.css",
