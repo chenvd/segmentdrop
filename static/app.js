@@ -82,29 +82,90 @@ function setSyncStatus(kind, title, detail) {
 }
 
 function renderSessions(sessions) {
+  const container = $("#sessions");
   $("#session-count").textContent = sessions.length ? `${sessions.length} 台设备` : "";
   if (!sessions.length) {
-    $("#sessions").innerHTML = `<div class="state-card"><h3>现在很安静</h3><p>当前没有带 TMDb ID 的电影或剧集正在播放。</p></div>`;
+    if (!$(".state-card[data-empty]", container)) {
+      container.innerHTML = `<div class="state-card" data-empty><h3>现在很安静</h3><p>当前没有带 TMDb ID 的电影或剧集正在播放。</p></div>`;
+    }
     return;
   }
-  $("#sessions").innerHTML = sessions.map(session => {
-    const episode = session.item_type === "episode"
-      ? `S${pad(session.season)} E${pad(session.episode)}${session.episode_title ? ` · ${escapeHtml(session.episode_title)}` : ""}`
-      : "电影";
-    const progress = session.progress_percent == null ? "" : `
-      <span class="progress-wrap">
-        <span class="progress-label"><span class="elapsed">${formatClock(session.position_ms)}</span><span>${Math.round(session.progress_percent)}% · ${formatClock(session.duration_ms)}</span></span>
-        <span class="progress" aria-label="播放进度 ${Math.round(session.progress_percent)}%"><i style="--progress:${session.progress_percent}%"></i></span>
-      </span>`;
-    return `<button class="session-card" data-session="${escapeHtml(session.session_id)}" data-item="${escapeHtml(session.item_id)}">
-      <span class="poster"><img src="${escapeHtml(session.poster_url)}" alt="${escapeHtml(session.title)} 海报" loading="lazy" onerror="this.classList.add('is-error')"></span>
-      <span class="session-info">
-        <span class="live-row"><span class="live-chip ${session.is_paused ? "paused" : ""}">${session.is_paused ? "Ⅱ 已暂停" : "▶ 播放中"}</span><span class="tag">${session.item_type === "episode" ? "剧集" : "电影"}</span></span>
-        <h3>${escapeHtml(session.title)}</h3><span class="episode-line">${episode}</span>
-        <span class="meta">${escapeHtml(session.user_name)} · ${escapeHtml(session.client)} ${escapeHtml(session.device_name)}</span>${progress}
-      </span>
-    </button>`;
-  }).join("");
+
+  $(".state-card", container)?.remove();
+  const existing = new Map($$(".session-card", container).map(card => [card.dataset.key, card]));
+
+  sessions.forEach((session, index) => {
+    const key = sessionKey(session);
+    let card = existing.get(key);
+    const needsProgress = session.progress_percent != null;
+    if (!card || Boolean($(".progress-wrap", card)) !== needsProgress) {
+      card?.remove();
+      card = createSessionCard(session, key);
+    }
+    updateSessionCard(card, session);
+
+    const current = container.children[index];
+    if (current !== card) container.insertBefore(card, current || null);
+    existing.delete(key);
+  });
+
+  existing.forEach(card => card.remove());
+}
+
+function sessionKey(session) {
+  return JSON.stringify([session.session_id, session.item_id]);
+}
+
+function createSessionCard(session, key) {
+  const progress = session.progress_percent == null ? "" : `
+    <span class="progress-wrap">
+      <span class="progress-label"><span class="elapsed"></span><span class="progress-total"></span></span>
+      <span class="progress"><i></i></span>
+    </span>`;
+  const template = document.createElement("template");
+  template.innerHTML = `<button class="session-card">
+    <span class="poster"><img alt="" loading="lazy" decoding="async" onerror="this.classList.add('is-error')"></span>
+    <span class="session-info">
+      <span class="live-row"><span class="live-chip"></span><span class="tag"></span></span>
+      <h3></h3><span class="episode-line"></span><span class="meta"></span>${progress}
+    </span>
+  </button>`;
+  const card = template.content.firstElementChild;
+  card.dataset.key = key;
+  return card;
+}
+
+function updateSessionCard(card, session) {
+  card.dataset.session = session.session_id;
+  card.dataset.item = session.item_id;
+
+  const image = $(".poster img", card);
+  if (image.dataset.src !== session.poster_url) {
+    image.dataset.src = session.poster_url;
+    image.alt = `${session.title} 海报`;
+    image.classList.remove("is-error");
+    image.src = session.poster_url;
+  }
+
+  const liveChip = $(".live-chip", card);
+  liveChip.classList.toggle("paused", session.is_paused);
+  liveChip.textContent = session.is_paused ? "Ⅱ 已暂停" : "▶ 播放中";
+  $(".tag", card).textContent = session.item_type === "episode" ? "剧集" : "电影";
+  $("h3", card).textContent = session.title;
+  $(".episode-line", card).textContent = session.item_type === "episode"
+    ? `S${pad(session.season)} E${pad(session.episode)}${session.episode_title ? ` · ${session.episode_title}` : ""}`
+    : "电影";
+  $(".meta", card).textContent = `${session.user_name} · ${session.client} ${session.device_name}`;
+
+  if (session.progress_percent != null) {
+    const progress = Math.max(0, Math.min(100, session.progress_percent));
+    const rounded = Math.round(progress);
+    $(".elapsed", card).textContent = formatClock(session.position_ms);
+    $(".progress-total", card).textContent = `${rounded}% · ${formatClock(session.duration_ms)}`;
+    const progressBar = $(".progress", card);
+    progressBar.setAttribute("aria-label", `播放进度 ${rounded}%`);
+    $(".progress i", card).style.setProperty("--progress", `${progress}%`);
+  }
 }
 
 function renderSessionError(error) {
