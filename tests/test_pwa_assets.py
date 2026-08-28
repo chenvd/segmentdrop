@@ -18,6 +18,12 @@ def png_size(path: Path) -> tuple[int, int]:
     return struct.unpack(">II", signature[16:24])
 
 
+def png_color_type(path: Path) -> int:
+    with path.open("rb") as image:
+        header = image.read(26)
+    return header[25]
+
+
 class PwaAssetTests(unittest.TestCase):
     def test_manifest_icons_exist_at_declared_sizes(self) -> None:
         manifest = json.loads((STATIC / "manifest.webmanifest").read_text())
@@ -32,6 +38,12 @@ class PwaAssetTests(unittest.TestCase):
         self.assertEqual(png_size(STATIC / "icons" / "apple-touch-icon.png"), (180, 180))
         self.assertTrue((STATIC / "favicon.ico").is_file())
         self.assertTrue((STATIC / "sw.js").is_file())
+
+    def test_regular_icons_have_alpha_and_maskable_icons_are_opaque(self) -> None:
+        self.assertEqual(png_color_type(STATIC / "icons" / "icon-512.png"), 6)
+        self.assertEqual(png_color_type(STATIC / "icons" / "favicon-32.png"), 6)
+        self.assertEqual(png_color_type(STATIC / "icons" / "icon-maskable-512.png"), 2)
+        self.assertEqual(png_color_type(STATIC / "icons" / "apple-touch-icon.png"), 2)
 
     def test_service_worker_has_root_scope(self) -> None:
         response = self.run_async(service_worker())
