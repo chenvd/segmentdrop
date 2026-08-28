@@ -1,0 +1,2 @@
+"""SegmentDrop application package."""
+

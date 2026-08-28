@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#050806">
+  <title>SegmentDrop · Emby → TheIntroDB</title>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+  <div class="noise"></div>
+  <svg width="0" height="0" aria-hidden="true" class="symbols">
+    <symbol id="icon-cut" viewBox="0 0 24 24"><path d="M7 4v16M17 4v16M4 8h6M14 16h6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
+    <symbol id="icon-home" viewBox="0 0 24 24"><path d="m4 10 8-6 8 6v9a1 1 0 0 1-1 1h-5v-6h-4v6H5a1 1 0 0 1-1-1z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
+    <symbol id="icon-settings" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M19 13.5v-3l-2-.7a7 7 0 0 0-.7-1.7l.9-1.9-2.1-2.1-1.9.9a7 7 0 0 0-1.7-.7L10.5 2h-3l-.7 2.3a7 7 0 0 0-1.7.7l-1.9-.9-2.1 2.1.9 1.9a7 7 0 0 0-.7 1.7l-2 .7v3l2 .7a7 7 0 0 0 .7 1.7l-.9 1.9 2.1 2.1 1.9-.9a7 7 0 0 0 1.7.7l.7 2.3h3l.7-2.3a7 7 0 0 0 1.7-.7l1.9.9 2.1-2.1-.9-1.9a7 7 0 0 0 .7-1.7z" transform="translate(2 0) scale(.83)" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
+    <symbol id="icon-arrow" viewBox="0 0 24 24"><path d="m14 5-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  </svg>
+
+  <main class="shell">
+    <header class="topbar">
+      <button class="brand" data-view="home" aria-label="返回正在播放"><span class="brand-mark"><svg><use href="#icon-cut"></use></svg></span><span class="brand-name">Segment<span>Drop</span></span></button>
+      <nav class="nav-actions" aria-label="主导航">
+        <button class="nav-btn active" data-view="home"><svg><use href="#icon-home"></use></svg><span>正在播放</span></button>
+        <button class="nav-btn" data-view="settings"><svg><use href="#icon-settings"></use></svg><span>设置</span></button>
+      </nav>
+    </header>
+
+    <section class="view active" id="view-home">
+      <div class="hero">
+        <div id="sync-status" class="sync-status is-loading"><i class="status-dot"></i><strong>正在连接 Emby</strong><i class="divider"></i><span>请稍候</span></div>
+        <h1>正在播放，<br><em>马上标记。</em></h1>
+        <p>从电视上的播放位置快速获取时间，完成片头、回顾、片尾和预告分段。</p>
+      </div>
+      <div class="section-head"><h2>活动 Session</h2><span id="session-count"></span></div>
+      <div id="sessions" class="sessions" aria-live="polite"><div class="state-card"><span class="loader"></span><h3>正在读取播放设备</h3></div></div>
+    </section>
+
+    <section class="view" id="view-editor">
+      <button class="back-btn" data-view="home"><svg><use href="#icon-arrow"></use></svg> 返回正在播放</button>
+      <div id="editor-loading" class="state-card"><span class="loader"></span><h3>正在加载影片信息</h3></div>
+      <div id="editor-content" hidden>
+        <div class="media-banner">
+          <div class="poster"><img id="detail-poster" alt="" decoding="async"></div>
+          <div class="media-copy"><span class="tag" id="detail-tag"></span><h2 id="detail-title"></h2><h3 id="detail-episode"></h3><p id="detail-meta"></p></div>
+        </div>
+        <div class="timeline-panel" id="timeline-panel">
+          <div class="timeline-head"><span>00:00:00</span><span>Emby 分段概览</span><span id="timeline-duration"></span></div>
+          <div class="timeline" id="timeline"></div>
+          <div class="legend"><span><i style="--color:var(--blue)"></i>回顾</span><span><i style="--color:var(--orange)"></i>片头</span><span><i style="--color:var(--purple)"></i>片尾</span><span><i style="--color:var(--teal)"></i>预告</span></div>
+        </div>
+        <div class="editor-head"><div><h2>分段时间</h2><p>点击“获取”读取当前设备的最新播放位置</p></div><button class="reset-all" id="reset-all">恢复 Emby 值</button></div>
+        <div class="segment-grid" id="segments"></div>
+        <div class="submit-dock"><button class="primary" id="submit-btn">提交分段 · 0 项</button></div>
+      </div>
+    </section>
+
+    <section class="view" id="view-settings">
+      <div class="settings-wrap">
+        <h1>连接你的<br><em>媒体服务。</em></h1>
+        <form class="settings-card" id="emby-form">
+          <h2>Emby</h2><p>读取正在播放的 Session 与媒体分段</p>
+          <div class="field"><label for="emby-url">Server URL</label><input id="emby-url" type="url" autocomplete="url" placeholder="http://192.168.1.8:8096"></div>
+          <div class="field"><label for="emby-key">API Key</label><input id="emby-key" type="password" autocomplete="off"></div>
+          <div class="settings-actions"><button class="secondary" type="button" data-test="emby">测试连接</button><button class="secondary save" type="submit">保存 Emby 设置</button></div>
+        </form>
+        <form class="settings-card" id="tidb-form">
+          <h2>TheIntroDB</h2><p>向社区数据库提交分段时间</p>
+          <div class="field"><label for="tidb-key">API Key</label><input id="tidb-key" type="password" autocomplete="off"></div>
+          <div class="settings-actions"><button class="secondary" type="button" data-test="theintrodb">测试 API Key</button><button class="secondary save" type="submit">保存 TheIntroDB 设置</button></div>
+        </form>
+      </div>
+    </section>
+  </main>
+
+  <div class="toast" id="toast" role="status"><strong></strong><span></span></div>
+  <div class="result-sheet" id="result-sheet" role="dialog" aria-modal="true" aria-labelledby="result-title">
+    <div class="result-box"><h2 id="result-title">提交结果</h2><p id="result-summary"></p><div class="result-list" id="result-list"></div><button class="primary" id="close-result">完成</button></div>
+  </div>
+  <script src="/static/app.js" defer></script>
+</body>
+</html>
+

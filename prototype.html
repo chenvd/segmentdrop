@@ -1,0 +1,873 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#050806">
+  <title>Segment Drop · Emby → TheIntroDB</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #050806;
+      --panel: rgba(16, 23, 19, .82);
+      --panel-solid: #101712;
+      --panel-soft: #151d18;
+      --line: rgba(220, 255, 232, .11);
+      --line-strong: rgba(220, 255, 232, .2);
+      --text: #f0f6f2;
+      --muted: #8f9b93;
+      --green: #00ec8b;
+      --green-soft: rgba(0, 236, 139, .13);
+      --blue: #388cff;
+      --orange: #ff812f;
+      --purple: #ac5cff;
+      --teal: #18c8ad;
+      --danger: #ff5d66;
+      --radius: 22px;
+      --shadow: 0 22px 70px rgba(0, 0, 0, .36);
+    }
+
+    * { box-sizing: border-box; }
+
+    html { background: var(--bg); }
+
+    body {
+      margin: 0;
+      min-width: 320px;
+      min-height: 100vh;
+      color: var(--text);
+      background:
+        radial-gradient(900px 420px at 50% -120px, rgba(0, 236, 139, .18), transparent 68%),
+        linear-gradient(180deg, #07100b 0, var(--bg) 260px);
+      font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    button, input { font: inherit; }
+    button { color: inherit; }
+    button, a { -webkit-tap-highlight-color: transparent; }
+
+    .noise {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      opacity: .22;
+      z-index: -1;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.08'/%3E%3C/svg%3E");
+    }
+
+    .shell {
+      width: min(1120px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 18px 0 96px;
+    }
+
+    .topbar {
+      position: sticky;
+      top: max(10px, env(safe-area-inset-top));
+      z-index: 20;
+      height: 62px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 10px 0 20px;
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      background: rgba(12, 20, 15, .72);
+      backdrop-filter: blur(22px) saturate(145%);
+      box-shadow: 0 12px 42px rgba(0, 0, 0, .25);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      border: 0;
+      background: none;
+      cursor: pointer;
+      padding: 7px 0;
+    }
+
+    .brand-mark {
+      width: 30px;
+      height: 30px;
+      display: grid;
+      place-items: center;
+      border-radius: 9px;
+      color: #021109;
+      background: var(--green);
+      box-shadow: 0 0 24px rgba(0, 236, 139, .28);
+    }
+
+    .brand-mark svg { width: 18px; height: 18px; }
+    .brand-name { font-size: 16px; font-weight: 780; letter-spacing: -.01em; }
+    .brand-name span { color: var(--green); }
+
+    .nav-actions { display: flex; gap: 5px; }
+    .nav-btn, .icon-btn {
+      min-height: 42px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 0 14px;
+      border: 1px solid transparent;
+      border-radius: 14px;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      transition: .18s ease;
+    }
+
+    .nav-btn:hover, .nav-btn.active, .icon-btn:hover {
+      color: var(--text);
+      background: rgba(255, 255, 255, .055);
+      border-color: var(--line);
+    }
+
+    .icon-btn { width: 42px; padding: 0; }
+    .nav-btn svg, .icon-btn svg { width: 18px; height: 18px; }
+
+    .view { display: none; animation: rise .26s ease; }
+    .view.active { display: block; }
+    @keyframes rise { from { opacity: 0; transform: translateY(7px); } }
+
+    .hero {
+      padding: 70px 4px 34px;
+      display: block;
+    }
+
+    .eyebrow {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      color: var(--muted);
+      font-size: 12px;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+    }
+
+    .pulse {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 0 6px rgba(0, 236, 139, .1), 0 0 18px var(--green);
+    }
+
+    h1 {
+      margin: 13px 0 10px;
+      font-size: clamp(36px, 6vw, 67px);
+      line-height: .98;
+      letter-spacing: -.055em;
+      font-weight: 780;
+    }
+
+    h1 em { color: var(--green); font-style: normal; font-weight: 480; }
+    .hero p { max-width: 570px; margin: 0; color: var(--muted); font-size: 16px; }
+
+    .sync-status {
+      width: fit-content;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 15px;
+      padding: 10px 14px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(0, 236, 139, .055);
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .sync-status strong { color: #dce7df; font-weight: 650; }
+
+    .sync-status .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 0 5px rgba(0, 236, 139, .09), 0 0 13px rgba(0, 236, 139, .8);
+    }
+
+    .sync-status .divider { width: 1px; height: 12px; background: var(--line-strong); }
+
+    .section-head {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      margin: 30px 4px 15px;
+    }
+
+    .section-head h2 { margin: 0; font-size: 17px; letter-spacing: -.02em; }
+    .section-head span { color: var(--muted); font-size: 12px; }
+
+    .sessions {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+    }
+
+    .session-card {
+      position: relative;
+      min-height: 238px;
+      overflow: hidden;
+      display: grid;
+      grid-template-columns: 150px 1fr;
+      gap: 22px;
+      padding: 18px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: linear-gradient(135deg, rgba(20, 31, 24, .97), rgba(9, 13, 11, .97));
+      box-shadow: var(--shadow);
+      cursor: pointer;
+      text-align: left;
+      transition: transform .2s ease, border-color .2s ease;
+    }
+
+    .session-card:hover { transform: translateY(-3px); border-color: rgba(0, 236, 139, .3); }
+    .session-card::after {
+      content: "";
+      position: absolute;
+      width: 220px;
+      height: 220px;
+      right: -90px;
+      bottom: -130px;
+      border-radius: 50%;
+      background: var(--glow, rgba(0, 236, 139, .15));
+      filter: blur(40px);
+    }
+
+    .poster {
+      position: relative;
+      min-height: 202px;
+      overflow: hidden;
+      border-radius: 15px;
+      background: #17231c;
+      box-shadow: 0 12px 35px rgba(0, 0, 0, .4);
+    }
+
+    .poster.silo {
+      background:
+        linear-gradient(145deg, transparent 55%, rgba(245, 172, 54, .72) 56% 58%, transparent 59%),
+        radial-gradient(circle at 54% 25%, #ffbc55 0 2%, transparent 2.5%),
+        linear-gradient(165deg, transparent 44%, #101411 45% 59%, transparent 60%),
+        linear-gradient(135deg, #526052, #121914 48%, #050807);
+    }
+
+    .poster.silo::after {
+      content: "SILO";
+      position: absolute;
+      inset: auto 0 14px;
+      text-align: center;
+      letter-spacing: .22em;
+      font: 700 24px/1 Georgia, serif;
+      color: #e8ddc5;
+    }
+
+    .poster.dune {
+      background:
+        radial-gradient(ellipse at 70% 20%, #fff3c8 0 3%, #e79b32 3.5% 6%, transparent 6.5%),
+        radial-gradient(ellipse at 50% 105%, #cb6e29 0 43%, transparent 44%),
+        linear-gradient(#211b19 0 38%, #8b4a24 39%, #e48b3c);
+    }
+
+    .poster.dune::after {
+      content: "DUNE";
+      position: absolute;
+      inset: auto 0 14px;
+      text-align: center;
+      letter-spacing: .16em;
+      font: 500 22px/1 Georgia, serif;
+      color: #fff0d8;
+    }
+
+    .session-info { min-width: 0; display: flex; flex-direction: column; z-index: 1; }
+    .live-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .live-chip, .tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      width: fit-content;
+      padding: 5px 9px;
+      border-radius: 999px;
+      background: var(--green-soft);
+      color: var(--green);
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .live-chip.paused { color: #ffbf5f; background: rgba(255, 181, 76, .12); }
+    .session-info h3 { margin: 18px 0 2px; font-size: 24px; letter-spacing: -.035em; }
+    .episode { color: #c5cec8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .meta { margin-top: 7px; color: var(--muted); font-size: 12px; }
+    .progress-wrap { margin-top: auto; }
+    .progress-label { display: flex; justify-content: space-between; margin-bottom: 8px; color: var(--muted); font-size: 11px; }
+    .progress-label .elapsed { color: #d5ded8; font-weight: 650; }
+    .progress {
+      position: relative;
+      display: block;
+      height: 8px;
+      border: 1px solid rgba(255, 255, 255, .085);
+      border-radius: 99px;
+      background: rgba(255, 255, 255, .095);
+      box-shadow: inset 0 1px 3px rgba(0, 0, 0, .5);
+    }
+    .progress i {
+      display: block;
+      width: var(--progress);
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, #00b971, var(--green));
+      box-shadow: 0 0 13px rgba(0, 236, 139, .42);
+    }
+
+    .back-btn {
+      margin: 32px 0 12px;
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      min-height: 44px;
+      padding: 0 13px;
+      border: 0;
+      background: none;
+      color: var(--muted);
+      cursor: pointer;
+    }
+
+    .back-btn:hover { color: var(--text); }
+    .back-btn svg { width: 18px; height: 18px; }
+
+    .media-banner {
+      position: relative;
+      overflow: hidden;
+      min-height: 258px;
+      display: grid;
+      grid-template-columns: 145px 1fr;
+      align-items: end;
+      gap: 24px;
+      padding: 28px;
+      border: 1px solid var(--line);
+      border-radius: 28px;
+      background:
+        linear-gradient(90deg, rgba(7, 11, 8, .98) 0 38%, rgba(7, 11, 8, .76)),
+        radial-gradient(circle at 80% 20%, rgba(0, 236, 139, .2), transparent 35%),
+        linear-gradient(135deg, #26382b, #050705);
+      box-shadow: var(--shadow);
+    }
+
+    .media-banner .poster { min-height: 194px; }
+    .media-copy { min-width: 0; z-index: 1; }
+    .media-copy .tag { margin-bottom: 10px; }
+    .media-copy h2 { margin: 0; font-size: clamp(27px, 4vw, 43px); letter-spacing: -.045em; }
+    .media-copy h3 { margin: 4px 0 9px; font-size: 17px; font-weight: 520; color: #ccd4cf; }
+    .media-copy p { margin: 0; color: var(--muted); font-size: 12px; }
+
+    .timeline-panel {
+      margin-top: 16px;
+      padding: 18px 20px;
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      background: rgba(15, 22, 17, .7);
+    }
+
+    .timeline-head { display: flex; justify-content: space-between; margin-bottom: 12px; color: var(--muted); font-size: 11px; }
+    .timeline { height: 7px; display: flex; gap: 2px; overflow: hidden; border-radius: 99px; background: rgba(255, 255, 255, .08); }
+    .timeline span { display: block; height: 100%; }
+    .timeline .recap { width: 4%; background: var(--blue); }
+    .timeline .intro { width: 6%; background: var(--orange); }
+    .timeline .body { width: 77%; background: rgba(255, 255, 255, .08); }
+    .timeline .credits { width: 9%; background: var(--purple); }
+    .timeline .preview { width: 4%; background: var(--teal); }
+    .legend { display: flex; flex-wrap: wrap; gap: 13px; margin-top: 12px; color: var(--muted); font-size: 11px; }
+    .legend span { display: flex; align-items: center; gap: 5px; }
+    .legend i { width: 7px; height: 7px; border-radius: 2px; background: var(--color); }
+
+    .editor-head { margin: 35px 4px 14px; display: flex; justify-content: space-between; align-items: end; }
+    .editor-head h2 { margin: 0 0 3px; font-size: 21px; }
+    .editor-head p { margin: 0; color: var(--muted); font-size: 12px; }
+    .reset-all {
+      min-height: 44px;
+      padding: 0 14px;
+      border: 1px solid var(--line);
+      border-radius: 13px;
+      background: rgba(255, 255, 255, .025);
+      color: var(--muted);
+      cursor: pointer;
+    }
+
+    .segment-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .segment-card {
+      --accent: var(--orange);
+      position: relative;
+      padding: 18px;
+      border: 1px solid var(--line);
+      border-radius: 21px;
+      background: linear-gradient(145deg, rgba(20, 28, 22, .94), rgba(11, 15, 12, .94));
+      box-shadow: 0 15px 45px rgba(0, 0, 0, .2);
+    }
+
+    .segment-card.recap { --accent: var(--blue); }
+    .segment-card.credits { --accent: var(--purple); }
+    .segment-card.preview { --accent: var(--teal); }
+    .segment-title { display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px; }
+    .segment-title h3 { display: flex; align-items: center; gap: 9px; margin: 0; font-size: 15px; text-transform: uppercase; letter-spacing: .08em; }
+    .segment-title h3 i { width: 8px; height: 8px; border-radius: 2px; background: var(--accent); box-shadow: 0 0 14px var(--accent); }
+    .clear-segment {
+      min-width: 52px;
+      min-height: 40px;
+      padding: 0 10px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: rgba(255, 255, 255, .025);
+      color: #d5ded8;
+      font-size: 11px;
+      cursor: pointer;
+    }
+    .clear-segment:hover:not(:disabled) { color: var(--text); border-color: var(--line-strong); background: rgba(255, 255, 255, .055); }
+
+    .time-block + .time-block { margin-top: 13px; }
+    .time-label { display: flex; justify-content: space-between; margin-bottom: 6px; color: var(--muted); font-size: 11px; }
+    .time-row { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+    .time-input {
+      min-width: 0;
+      height: 48px;
+      padding: 0 13px;
+      border: 1px solid var(--line);
+      border-radius: 13px;
+      outline: 0;
+      background: rgba(0, 0, 0, .22);
+      color: var(--text);
+      font: 620 16px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+      letter-spacing: -.03em;
+      transition: .18s ease;
+    }
+
+    .time-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 15%, transparent); }
+    .capture {
+      height: 48px;
+      padding: 0 14px;
+      border: 1px solid color-mix(in srgb, var(--accent) 38%, transparent);
+      border-radius: 13px;
+      background: color-mix(in srgb, var(--accent) 12%, transparent);
+      color: var(--accent);
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .adjust-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 7px; }
+    .adjust {
+      min-height: 40px;
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      background: rgba(255, 255, 255, .025);
+      color: #aeb9b1;
+      font-size: 11px;
+      cursor: pointer;
+    }
+
+    .adjust:active, .capture:active, .primary:active { transform: scale(.98); }
+
+    .submit-dock {
+      position: sticky;
+      bottom: max(12px, env(safe-area-inset-bottom));
+      z-index: 15;
+      margin: 20px auto 0;
+      max-width: 580px;
+      padding: 7px;
+      border: 1px solid var(--line-strong);
+      border-radius: 19px;
+      background: rgba(11, 18, 13, .88);
+      backdrop-filter: blur(22px);
+      box-shadow: 0 16px 50px rgba(0, 0, 0, .5);
+    }
+
+    .primary {
+      width: 100%;
+      min-height: 54px;
+      border: 0;
+      border-radius: 14px;
+      background: var(--green);
+      color: #021109;
+      font-weight: 800;
+      cursor: pointer;
+      box-shadow: 0 9px 28px rgba(0, 236, 139, .19);
+    }
+
+    .settings-wrap { max-width: 720px; margin: 58px auto 0; }
+    .settings-wrap h1 { font-size: clamp(34px, 6vw, 54px); }
+    .settings-card { margin-top: 16px; padding: 22px; border: 1px solid var(--line); border-radius: 22px; background: var(--panel); }
+    .settings-card h2 { margin: 0 0 4px; font-size: 18px; }
+    .settings-card > p { margin: 0 0 18px; color: var(--muted); font-size: 12px; }
+    .field { margin-top: 13px; }
+    .field label { display: block; margin-bottom: 6px; color: #b4beb7; font-size: 12px; }
+    .field input {
+      width: 100%;
+      height: 50px;
+      padding: 0 14px;
+      border: 1px solid var(--line);
+      border-radius: 13px;
+      outline: 0;
+      background: rgba(0, 0, 0, .22);
+      color: var(--text);
+    }
+
+    .field input:focus { border-color: var(--green); }
+    .settings-actions { display: flex; justify-content: space-between; gap: 10px; margin-top: 17px; }
+    .secondary { min-height: 46px; padding: 0 15px; border: 1px solid var(--line); border-radius: 13px; background: rgba(255, 255, 255, .03); color: #c8d1cb; cursor: pointer; }
+    .save { background: var(--green-soft); border-color: rgba(0, 236, 139, .25); color: var(--green); }
+
+    .toast {
+      position: fixed;
+      z-index: 50;
+      left: 50%;
+      top: calc(env(safe-area-inset-top, 0px) + 84px);
+      width: min(420px, calc(100% - 28px));
+      padding: 15px 17px;
+      border: 1px solid var(--line-strong);
+      border-radius: 16px;
+      background: rgba(18, 27, 21, .96);
+      box-shadow: var(--shadow);
+      transform: translate(-50%, -24px);
+      opacity: 0;
+      pointer-events: none;
+      transition: .28s ease;
+    }
+
+    .toast.show { transform: translate(-50%, 0); opacity: 1; }
+    .toast strong { display: block; margin-bottom: 2px; }
+    .toast span { color: var(--muted); font-size: 12px; }
+
+    .result-sheet {
+      position: fixed;
+      inset: 0;
+      z-index: 40;
+      display: none;
+      place-items: end center;
+      padding: 18px;
+      background: rgba(0, 0, 0, .68);
+      backdrop-filter: blur(6px);
+    }
+
+    .result-sheet.show { display: grid; }
+    .result-box { width: min(520px, 100%); padding: 22px; border: 1px solid var(--line-strong); border-radius: 25px; background: #111a14; box-shadow: var(--shadow); animation: sheet .25s ease; }
+    @keyframes sheet { from { transform: translateY(30px); opacity: 0; } }
+    .result-box h2 { margin: 0 0 3px; font-size: 22px; }
+    .result-box > p { margin: 0 0 17px; color: var(--muted); font-size: 12px; }
+    .result-list { display: grid; gap: 8px; }
+    .result-item { display: flex; align-items: center; justify-content: space-between; padding: 12px 13px; border-radius: 13px; background: rgba(255, 255, 255, .035); }
+    .result-item b { font-size: 13px; }
+    .result-item span { color: var(--green); font-size: 12px; }
+    .result-box .primary { margin-top: 16px; }
+
+    @media (min-width: 720px) {
+      .result-sheet { place-items: center; }
+    }
+
+    @media (max-width: 850px) {
+      .sessions { grid-template-columns: 1fr; }
+      .session-card { grid-template-columns: 125px 1fr; min-height: 214px; }
+      .poster { min-height: 178px; }
+      .media-banner { grid-template-columns: 120px 1fr; }
+      .media-banner .poster { min-height: 170px; }
+      .segment-grid { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 600px) {
+      body { background: radial-gradient(500px 300px at 50% -100px, rgba(0, 236, 139, .17), transparent 70%), var(--bg); }
+      .shell { width: min(100% - 20px, 1120px); padding-top: 10px; }
+      .topbar { height: 56px; border-radius: 17px; padding-left: 14px; }
+      .brand-name { font-size: 14px; }
+      .nav-btn { width: 42px; padding: 0; }
+      .nav-btn span { display: none; }
+      .hero { padding: 48px 4px 23px; display: block; }
+      h1 { font-size: 43px; }
+      .hero p { font-size: 14px; }
+      .sync-status { margin-bottom: 14px; }
+      .section-head { margin-top: 25px; }
+      .sessions { gap: 11px; }
+      .session-card { min-height: 174px; grid-template-columns: 104px 1fr; gap: 15px; padding: 12px; border-radius: 19px; }
+      .poster { min-height: 150px; border-radius: 12px; }
+      .poster.silo::after, .poster.dune::after { font-size: 18px; }
+      .session-info h3 { margin-top: 10px; font-size: 20px; }
+      .episode { font-size: 13px; }
+      .meta { font-size: 10px; }
+      .back-btn { margin-top: 20px; }
+      .media-banner { min-height: 0; grid-template-columns: 88px 1fr; align-items: center; gap: 14px; padding: 14px; border-radius: 20px; }
+      .media-banner .poster { min-height: 127px; }
+      .media-copy h2 { font-size: 26px; }
+      .media-copy h3 { font-size: 13px; margin-top: 2px; }
+      .media-copy p { line-height: 1.55; }
+      .timeline-panel { margin-top: 10px; padding: 14px; border-radius: 16px; }
+      .legend { justify-content: space-between; gap: 6px; }
+      .editor-head { margin-top: 28px; }
+      .editor-head h2 { font-size: 19px; }
+      .reset-all { width: 44px; padding: 0; font-size: 0; }
+      .reset-all::after { content: "↺"; font-size: 20px; }
+      .segment-grid { gap: 10px; }
+      .segment-card { padding: 15px 13px; border-radius: 18px; }
+      .time-input { font-size: 15px; }
+      .capture { padding: 0 13px; }
+      .submit-dock { margin-top: 14px; }
+      .settings-wrap { margin-top: 38px; }
+      .settings-card { padding: 17px 14px; }
+      .settings-actions { flex-direction: column; }
+      .settings-actions button { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <div class="noise"></div>
+  <svg width="0" height="0" aria-hidden="true" style="position:absolute">
+    <symbol id="icon-cut" viewBox="0 0 24 24"><path d="M7 4v16M17 4v16M4 8h6M14 16h6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
+    <symbol id="icon-home" viewBox="0 0 24 24"><path d="m4 10 8-6 8 6v9a1 1 0 0 1-1 1h-5v-6h-4v6H5a1 1 0 0 1-1-1z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
+    <symbol id="icon-settings" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M19 13.5v-3l-2-.7a7 7 0 0 0-.7-1.7l.9-1.9-2.1-2.1-1.9.9a7 7 0 0 0-1.7-.7L10.5 2h-3l-.7 2.3a7 7 0 0 0-1.7.7l-1.9-.9-2.1 2.1.9 1.9a7 7 0 0 0-.7 1.7l-2 .7v3l2 .7a7 7 0 0 0 .7 1.7l-.9 1.9 2.1 2.1 1.9-.9a7 7 0 0 0 1.7.7l.7 2.3h3l.7-2.3a7 7 0 0 0 1.7-.7l1.9.9 2.1-2.1-.9-1.9a7 7 0 0 0 .7-1.7z" transform="translate(2 0) scale(.83)" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
+    <symbol id="icon-arrow" viewBox="0 0 24 24"><path d="m14 5-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  </svg>
+
+  <main class="shell">
+    <header class="topbar">
+      <button class="brand" data-view-target="home" aria-label="返回正在播放">
+        <span class="brand-mark"><svg><use href="#icon-cut"></use></svg></span>
+        <span class="brand-name">Segment<span>Drop</span></span>
+      </button>
+      <nav class="nav-actions" aria-label="主导航">
+        <button class="nav-btn active" data-view-target="home"><svg><use href="#icon-home"></use></svg><span>正在播放</span></button>
+        <button class="nav-btn" data-view-target="settings"><svg><use href="#icon-settings"></use></svg><span>设置</span></button>
+      </nav>
+    </header>
+
+    <section class="view active" id="view-home">
+      <div class="hero">
+        <div>
+          <div class="sync-status"><i class="status-dot"></i><strong>Emby 已连接</strong><i class="divider"></i><span>刚刚同步</span></div>
+          <h1>正在播放，<br><em>马上标记。</em></h1>
+          <p>从电视上的暂停位置快速获取时间，完成片头、回顾、片尾和预告分段。</p>
+        </div>
+      </div>
+
+      <div class="section-head">
+        <h2>活动 Session</h2>
+        <span>2 台设备</span>
+      </div>
+
+      <div class="sessions">
+        <button class="session-card" data-open-editor style="--progress:38%">
+          <span class="poster silo" aria-label="羊毛战记海报占位图"></span>
+          <span class="session-info">
+            <span class="live-row"><span class="live-chip paused">Ⅱ 已暂停</span><span class="tag">剧集</span></span>
+            <strong><h3>羊毛战记</h3></strong>
+            <span class="episode">S02 E06 · 路障</span>
+            <span class="meta">Chris · Apple TV 客厅</span>
+            <span class="progress-wrap">
+              <span class="progress-label"><span class="elapsed">00:19:42</span><span>38% · 00:51:58</span></span>
+              <span class="progress"><i></i></span>
+            </span>
+          </span>
+        </button>
+
+        <button class="session-card" data-open-editor style="--progress:67%; --glow:rgba(255,128,47,.18)">
+          <span class="poster dune" aria-label="沙丘海报占位图"></span>
+          <span class="session-info">
+            <span class="live-row"><span class="live-chip">▶ 播放中</span><span class="tag">电影</span></span>
+            <strong><h3>沙丘：第二部</h3></strong>
+            <span class="episode">Dune: Part Two</span>
+            <span class="meta">Guest · Chrome 客厅电脑</span>
+            <span class="progress-wrap">
+              <span class="progress-label"><span class="elapsed">01:51:20</span><span>67% · 02:46:00</span></span>
+              <span class="progress"><i></i></span>
+            </span>
+          </span>
+        </button>
+      </div>
+    </section>
+
+    <section class="view" id="view-editor">
+      <button class="back-btn" data-view-target="home"><svg><use href="#icon-arrow"></use></svg> 返回正在播放</button>
+
+      <div class="media-banner">
+        <div class="poster silo"></div>
+        <div class="media-copy">
+          <span class="tag">电视剧 · 2024</span>
+          <h2>羊毛战记</h2>
+          <h3>S02 E06 · 路障</h3>
+          <p>TMDb 125988 · Emby 条目 84321</p>
+        </div>
+      </div>
+
+      <div class="timeline-panel">
+        <div class="timeline-head"><span>00:00:00</span><span>Emby 分段概览</span><span>00:51:58</span></div>
+        <div class="timeline"><span class="recap"></span><span class="intro"></span><span class="body"></span><span class="credits"></span><span class="preview"></span></div>
+        <div class="legend">
+          <span><i style="--color:var(--blue)"></i>回顾</span><span><i style="--color:var(--orange)"></i>片头</span><span><i style="--color:var(--purple)"></i>片尾</span><span><i style="--color:var(--teal)"></i>预告</span>
+        </div>
+      </div>
+
+      <div class="editor-head">
+        <div><h2>分段时间</h2><p>点击“获取”读取 Apple TV 的最新播放位置</p></div>
+        <button class="reset-all" id="reset-all">恢复 Emby 值</button>
+      </div>
+
+      <div class="segment-grid" id="segments">
+        <article class="segment-card intro" data-segment="intro">
+          <div class="segment-title"><h3><i></i> 片头</h3><button class="clear-segment">清空</button></div>
+          <div class="time-block"><div class="time-label"><span>START</span><span>可为空</span></div><div class="time-row"><input class="time-input" value="00:01:31.0" placeholder="可为空" inputmode="decimal" aria-label="片头开始时间"><button class="capture">获取</button></div><div class="adjust-row"><button class="adjust" data-delta="-1">−1s</button><button class="adjust" data-delta="-.1">−0.1s</button><button class="adjust" data-delta=".1">+0.1s</button><button class="adjust" data-delta="1">+1s</button></div></div>
+          <div class="time-block"><div class="time-label"><span>END</span><span>必填</span></div><div class="time-row"><input class="time-input" value="00:02:48.0" inputmode="decimal" aria-label="片头结束时间"><button class="capture">获取</button></div><div class="adjust-row"><button class="adjust" data-delta="-1">−1s</button><button class="adjust" data-delta="-.1">−0.1s</button><button class="adjust" data-delta=".1">+0.1s</button><button class="adjust" data-delta="1">+1s</button></div></div>
+        </article>
+
+        <article class="segment-card recap" data-segment="recap">
+          <div class="segment-title"><h3><i></i> 回顾</h3><button class="clear-segment">清空</button></div>
+          <div class="time-block"><div class="time-label"><span>START</span><span>可为空</span></div><div class="time-row"><input class="time-input" value="00:00:05.4" placeholder="可为空" inputmode="decimal" aria-label="回顾开始时间"><button class="capture">获取</button></div><div class="adjust-row"><button class="adjust" data-delta="-1">−1s</button><button class="adjust" data-delta="-.1">−0.1s</button><button class="adjust" data-delta=".1">+0.1s</button><button class="adjust" data-delta="1">+1s</button></div></div>
+          <div class="time-block"><div class="time-label"><span>END</span><span>必填</span></div><div class="time-row"><input class="time-input" value="00:01:29.8" inputmode="decimal" aria-label="回顾结束时间"><button class="capture">获取</button></div><div class="adjust-row"><button class="adjust" data-delta="-1">−1s</button><button class="adjust" data-delta="-.1">−0.1s</button><button class="adjust" data-delta=".1">+0.1s</button><button class="adjust" data-delta="1">+1s</button></div></div>
+        </article>
+
+        <article class="segment-card credits" data-segment="credits">
+          <div class="segment-title"><h3><i></i> 片尾</h3><button class="clear-segment" hidden>清空</button></div>
+          <div class="time-block"><div class="time-label"><span>START</span><span>必填</span></div><div class="time-row"><input class="time-input" value="" inputmode="decimal" aria-label="片尾开始时间"><button class="capture">获取</button></div><div class="adjust-row"><button class="adjust" data-delta="-1">−1s</button><button class="adjust" data-delta="-.1">−0.1s</button><button class="adjust" data-delta=".1">+0.1s</button><button class="adjust" data-delta="1">+1s</button></div></div>
+          <div class="time-block"><div class="time-label"><span>END</span><span>可为空</span></div><div class="time-row"><input class="time-input" value="" placeholder="可为空" inputmode="decimal" aria-label="片尾结束时间"><button class="capture">获取</button></div><div class="adjust-row"><button class="adjust" data-delta="-1">−1s</button><button class="adjust" data-delta="-.1">−0.1s</button><button class="adjust" data-delta=".1">+0.1s</button><button class="adjust" data-delta="1">+1s</button></div></div>
+        </article>
+
+        <article class="segment-card preview" data-segment="preview">
+          <div class="segment-title"><h3><i></i> 预告</h3><button class="clear-segment" hidden>清空</button></div>
+          <div class="time-block"><div class="time-label"><span>START</span><span>必填</span></div><div class="time-row"><input class="time-input" value="" inputmode="decimal" aria-label="预告开始时间"><button class="capture">获取</button></div><div class="adjust-row"><button class="adjust" data-delta="-1">−1s</button><button class="adjust" data-delta="-.1">−0.1s</button><button class="adjust" data-delta=".1">+0.1s</button><button class="adjust" data-delta="1">+1s</button></div></div>
+          <div class="time-block"><div class="time-label"><span>END</span><span>可为空</span></div><div class="time-row"><input class="time-input" value="" placeholder="可为空" inputmode="decimal" aria-label="预告结束时间"><button class="capture">获取</button></div><div class="adjust-row"><button class="adjust" data-delta="-1">−1s</button><button class="adjust" data-delta="-.1">−0.1s</button><button class="adjust" data-delta=".1">+0.1s</button><button class="adjust" data-delta="1">+1s</button></div></div>
+        </article>
+      </div>
+
+      <div class="submit-dock"><button class="primary" id="submit-btn">提交本集分段 · 2 项</button></div>
+    </section>
+
+    <section class="view" id="view-settings">
+      <div class="settings-wrap">
+        <h1>连接你的<br><em>媒体服务。</em></h1>
+        <div class="settings-card">
+          <h2>Emby</h2><p>读取正在播放的 Session 与媒体分段</p>
+          <div class="field"><label for="emby-url">Server URL</label><input id="emby-url" value="http://192.168.1.8:8096"></div>
+          <div class="field"><label for="emby-key">API Key</label><input id="emby-key" type="password" value="prototype-only-key"></div>
+          <div class="settings-actions"><button class="secondary" data-toast="Emby 连接正常">测试连接</button><button class="secondary save" data-toast="Emby 设置已保存">保存 Emby 设置</button></div>
+        </div>
+        <div class="settings-card">
+          <h2>TheIntroDB</h2><p>向社区数据库提交分段时间</p>
+          <div class="field"><label for="tidb-key">API Key</label><input id="tidb-key" type="password" value="prototype-only-key"></div>
+          <div class="settings-actions"><button class="secondary" data-toast="TheIntroDB API Key 有效">测试 API Key</button><button class="secondary save" data-toast="TheIntroDB 设置已保存">保存 TheIntroDB 设置</button></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div class="toast" id="toast"><strong>已获取播放位置</strong><span>来自 Apple TV 客厅</span></div>
+
+  <div class="result-sheet" id="result-sheet" role="dialog" aria-modal="true" aria-labelledby="result-title">
+    <div class="result-box">
+      <h2 id="result-title">提交完成</h2>
+      <p>本集已处理 2 个分段</p>
+      <div class="result-list">
+        <div class="result-item"><b>片头</b><span>✓ 提交成功</span></div>
+        <div class="result-item"><b>回顾</b><span>○ 已经提交过</span></div>
+      </div>
+      <button class="primary" id="close-result">完成</button>
+    </div>
+  </div>
+
+  <script>
+    const views = document.querySelectorAll('.view');
+    const navButtons = document.querySelectorAll('.nav-btn');
+    const defaults = [...document.querySelectorAll('.time-input')].map(input => input.value);
+
+    function showView(name) {
+      views.forEach(view => view.classList.toggle('active', view.id === `view-${name}`));
+      navButtons.forEach(button => button.classList.toggle('active', button.dataset.viewTarget === name));
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    document.querySelectorAll('[data-view-target]').forEach(button => {
+      button.addEventListener('click', () => showView(button.dataset.viewTarget));
+    });
+    document.querySelectorAll('[data-open-editor]').forEach(button => button.addEventListener('click', () => showView('editor')));
+
+    function parseTime(value) {
+      const parts = value.trim().split(':').map(Number);
+      if (parts.length !== 3 || parts.some(Number.isNaN)) return 0;
+      return Math.max(0, parts[0] * 3600 + parts[1] * 60 + parts[2]);
+    }
+
+    function formatTime(total) {
+      total = Math.max(0, Math.round(total * 10) / 10);
+      const hours = Math.floor(total / 3600);
+      const minutes = Math.floor((total % 3600) / 60);
+      const seconds = (total % 60).toFixed(1).padStart(4, '0');
+      return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${seconds}`;
+    }
+
+    function showToast(title, detail = '原型交互 · 未发送真实请求') {
+      const toast = document.querySelector('#toast');
+      toast.querySelector('strong').textContent = title;
+      toast.querySelector('span').textContent = detail;
+      toast.classList.add('show');
+      clearTimeout(window.toastTimer);
+      window.toastTimer = setTimeout(() => toast.classList.remove('show'), 2200);
+    }
+
+    document.querySelectorAll('.adjust').forEach(button => {
+      button.addEventListener('click', () => {
+        const input = button.closest('.time-block').querySelector('.time-input');
+        input.value = formatTime(parseTime(input.value) + Number(button.dataset.delta));
+        updateCount();
+      });
+    });
+
+    let fakePosition = 1182.3;
+    document.querySelectorAll('.capture').forEach(button => {
+      button.addEventListener('click', () => {
+        fakePosition += 3.7;
+        const value = formatTime(fakePosition);
+        button.closest('.time-row').querySelector('.time-input').value = value;
+        showToast('已获取最新播放位置', `Apple TV 客厅 · ${value}`);
+        updateCount();
+      });
+    });
+
+    document.querySelectorAll('.time-input').forEach(input => input.addEventListener('input', updateCount));
+
+    const segmentNames = { intro: '片头', recap: '回顾', credits: '片尾', preview: '预告' };
+
+    document.querySelectorAll('.clear-segment').forEach(button => {
+      button.addEventListener('click', () => {
+        const card = button.closest('.segment-card');
+        card.querySelectorAll('.time-input').forEach(input => input.value = '');
+        updateCount();
+        showToast(`已清空${segmentNames[card.dataset.segment]}`, '本次提交将忽略这个分段');
+      });
+    });
+
+    function updateCount() {
+      const cards = [...document.querySelectorAll('.segment-card')];
+      cards.forEach(card => {
+        const hasValue = [...card.querySelectorAll('.time-input')].some(input => input.value.trim());
+        card.querySelector('.clear-segment').hidden = !hasValue;
+      });
+      const count = cards.filter(card => {
+        const values = [...card.querySelectorAll('.time-input')].map(input => input.value.trim());
+        const type = card.dataset.segment;
+        return type === 'intro' || type === 'recap' ? Boolean(values[1]) : Boolean(values[0]);
+      }).length;
+      document.querySelector('#submit-btn').textContent = `提交本集分段 · ${count} 项`;
+    }
+
+    document.querySelector('#reset-all').addEventListener('click', () => {
+      document.querySelectorAll('.time-input').forEach((input, index) => input.value = defaults[index]);
+      updateCount();
+      showToast('已恢复 Emby 原始分段');
+    });
+
+    document.querySelector('#submit-btn').addEventListener('click', () => document.querySelector('#result-sheet').classList.add('show'));
+    document.querySelector('#close-result').addEventListener('click', () => document.querySelector('#result-sheet').classList.remove('show'));
+    document.querySelector('#result-sheet').addEventListener('click', event => {
+      if (event.target.id === 'result-sheet') event.currentTarget.classList.remove('show');
+    });
+
+    document.querySelectorAll('[data-toast]').forEach(button => button.addEventListener('click', () => showToast(button.dataset.toast)));
+    updateCount();
+  </script>
+</body>
+</html>
