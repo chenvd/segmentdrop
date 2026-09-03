@@ -37,5 +37,4 @@ class SubmitInput(BaseModel):
     session_id: str = Field(min_length=1)
     item_id: str = Field(min_length=1)
     media: SubmitMedia
-    segments: list[SegmentInput] = Field(min_length=1, max_length=40)
-
+    segment: SegmentInput

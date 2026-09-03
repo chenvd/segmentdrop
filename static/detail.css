@@ -1,0 +1,35 @@
+.editor-column {
+  min-width: 0;
+}
+
+@media (min-width: 960px) {
+  .editor-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1.25fr) minmax(390px, .75fr);
+    gap: 22px;
+    align-items: start;
+  }
+
+  .editor-media,
+  .editor-controls {
+    display: grid;
+    gap: 16px;
+  }
+
+  .editor-media .timeline-panel,
+  .editor-controls .segment-type-picker,
+  .editor-controls .submit-dock {
+    margin: 0;
+  }
+
+  .editor-controls .segment-type-picker,
+  .editor-controls .segment-grid,
+  .editor-controls .submit-dock {
+    width: 100%;
+    max-width: none;
+  }
+
+  .editor-controls .submit-dock {
+    position: static;
+  }
+}

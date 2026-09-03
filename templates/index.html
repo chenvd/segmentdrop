@@ -13,6 +13,7 @@
   <link rel="icon" type="image/png" sizes="16x16" href="/static/icons/favicon-16.png">
   <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
   <link rel="stylesheet" href="/static/app.css">
+  <link rel="stylesheet" href="/static/detail.css">
 </head>
 <body>
   <div class="noise"></div>
@@ -44,19 +45,28 @@
     <section class="view" id="view-editor">
       <button class="back-btn" data-view="home"><svg><use href="#icon-arrow"></use></svg> 返回正在播放</button>
       <div id="editor-loading" class="state-card"><span class="loader"></span><h3>正在加载影片信息</h3></div>
-      <div id="editor-content" hidden>
-        <div class="media-banner">
-          <div class="poster"><img id="detail-poster" alt="" decoding="async"></div>
-          <div class="media-copy"><span class="tag" id="detail-tag"></span><h2 id="detail-title"></h2><h3 id="detail-episode"></h3><p id="detail-meta"></p></div>
+      <div class="editor-layout" id="editor-content" hidden>
+        <div class="editor-column editor-media">
+          <div class="media-banner">
+            <div class="poster"><img id="detail-poster" alt="" decoding="async"></div>
+            <div class="media-copy"><span class="tag" id="detail-tag"></span><h2 id="detail-title"></h2><h3 id="detail-episode"></h3><p id="detail-meta"></p></div>
+          </div>
+          <div class="timeline-panel" id="timeline-panel">
+            <div class="timeline-head"><span>00:00:00</span><span id="timeline-label">本次提交预览</span><span id="timeline-duration"></span></div>
+            <div class="timeline" id="timeline"></div>
+            <div class="legend" id="timeline-legend"></div>
+          </div>
         </div>
-        <div class="timeline-panel" id="timeline-panel">
-          <div class="timeline-head"><span>00:00:00</span><span>Emby 分段概览</span><span id="timeline-duration"></span></div>
-          <div class="timeline" id="timeline"></div>
-          <div class="legend"><span><i style="--color:var(--blue)"></i>回顾</span><span><i style="--color:var(--orange)"></i>片头</span><span><i style="--color:var(--purple)"></i>片尾</span><span><i style="--color:var(--teal)"></i>预告</span></div>
+        <div class="editor-column editor-controls">
+          <div class="segment-type-picker" id="segment-type-picker" role="group" aria-label="片段类型">
+            <button type="button" data-kind="intro" aria-pressed="true">片头</button>
+            <button type="button" data-kind="recap" aria-pressed="false">回顾</button>
+            <button type="button" data-kind="credits" aria-pressed="false">片尾</button>
+            <button type="button" data-kind="preview" aria-pressed="false">预告</button>
+          </div>
+          <div class="segment-grid" id="segments"></div>
+          <div class="submit-dock"><button class="primary" id="submit-btn" disabled>提交本片片头</button></div>
         </div>
-        <div class="editor-head"><div><h2>分段时间</h2><p>点击“获取”读取当前设备的最新播放位置</p></div><button class="reset-all" id="reset-all">恢复 Emby 值</button></div>
-        <div class="segment-grid" id="segments"></div>
-        <div class="submit-dock"><button class="primary" id="submit-btn">提交分段 · 0 项</button></div>
       </div>
     </section>
 
@@ -64,7 +74,7 @@
       <div class="settings-wrap">
         <h1>连接你的<br><em>媒体服务。</em></h1>
         <form class="settings-card" id="emby-form">
-          <h2>Emby</h2><p>读取正在播放的 Session 与媒体分段</p>
+          <h2>Emby</h2><p>读取正在播放的 Session、媒体信息与播放位置</p>
           <div class="field"><label for="emby-url">Server URL</label><input id="emby-url" type="url" autocomplete="url" placeholder="http://192.168.1.8:8096"></div>
           <div class="field"><label for="emby-key">API Key</label><input id="emby-key" type="password" autocomplete="off"></div>
           <div class="settings-actions"><button class="secondary" type="button" data-test="emby">测试连接</button><button class="secondary save" type="submit">保存 Emby 设置</button></div>

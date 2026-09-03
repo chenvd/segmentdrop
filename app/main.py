@@ -155,33 +155,26 @@ async def submit(body: SubmitInput, request: Request) -> dict[str, Any]:
     settings = store.load()
     detail = await request.app.state.emby.session_detail(settings.emby, body.session_id, body.item_id)
     _validate_identity(detail, body)
-    validated = _validate_segments(body, detail.get("duration_ms"))
-    results: list[dict[str, Any]] = []
-    stop = False
-    for segment in validated:
-        if stop:
-            results.append({"type": segment["type"], "status": "skipped", "message": "因 API Key 无效未继续提交"})
-            continue
-        external: dict[str, Any] = {
-            "tmdb_id": detail["tmdb_id"],
-            "type": "tv" if detail["item_type"] == "episode" else "movie",
-            "segment": segment["type"],
-            "start_ms": segment["start_ms"],
-            "end_ms": segment["end_ms"],
-        }
-        if detail["item_type"] == "episode":
-            external.update({"season": detail["season"], "episode": detail["episode"]})
-        duration = detail.get("duration_ms")
-        if duration is not None and 300_000 <= duration <= 21_600_000:
-            external["video_duration_ms"] = duration
-        try:
-            result = await request.app.state.theintrodb.submit(settings.theintrodb, external)
-            results.append({"type": segment["type"], **result})
-        except AppError as exc:
-            status = "duplicate" if exc.code == "THEINTRODB_DUPLICATE" else "error"
-            results.append({"type": segment["type"], "status": status, "code": exc.code, "message": exc.message})
-            stop = exc.code in {"THEINTRODB_UNAUTHORIZED", "SETTINGS_REQUIRED"}
-    return {"results": results, "submitted": len(validated)}
+    segment = _validate_segment(body, detail.get("duration_ms"))
+    external: dict[str, Any] = {
+        "tmdb_id": detail["tmdb_id"],
+        "type": "tv" if detail["item_type"] == "episode" else "movie",
+        "segment": segment["type"],
+        "start_ms": segment["start_ms"],
+        "end_ms": segment["end_ms"],
+    }
+    if detail["item_type"] == "episode":
+        external.update({"season": detail["season"], "episode": detail["episode"]})
+    duration = detail.get("duration_ms")
+    if duration is not None and 300_000 <= duration <= 21_600_000:
+        external["video_duration_ms"] = duration
+    try:
+        result = await request.app.state.theintrodb.submit(settings.theintrodb, external)
+        submitted = {"type": segment["type"], **result}
+    except AppError as exc:
+        status = "duplicate" if exc.code == "THEINTRODB_DUPLICATE" else "error"
+        submitted = {"type": segment["type"], "status": status, "code": exc.code, "message": exc.message}
+    return {"result": submitted, "submitted": 1}
 
 
 def _masked(value: str) -> str | None:
@@ -202,39 +195,28 @@ def _validate_identity(detail: dict[str, Any], body: SubmitInput) -> None:
         raise AppError("SESSION_ITEM_CHANGED", "媒体信息已经改变，请重新打开详情页。", 409)
 
 
-def _validate_segments(body: SubmitInput, duration_ms: int | None) -> list[dict[str, Any]]:
+def _validate_segment(body: SubmitInput, duration_ms: int | None) -> dict[str, Any]:
     limits = {"intro": (5_000, 200_000), "recap": (5_000, 1_200_000), "credits": (5_000, 1_800_000), "preview": (5_000, 1_800_000)}
-    output: list[dict[str, Any]] = []
-    grouped: dict[str, list[tuple[int, int]]] = {}
-    for segment in body.segments:
-        start, end, kind = segment.start_ms, segment.end_ms, segment.type
-        if start is None and end is None:
-            continue
-        if kind in {"intro", "recap"} and end is None:
-            raise AppError("SEGMENT_INVALID", f"{_segment_name(kind)}的 End 为必填项。", 422)
-        if kind in {"credits", "preview"} and start is None:
-            raise AppError("SEGMENT_INVALID", f"{_segment_name(kind)}的 Start 为必填项。", 422)
-        effective_start = start or 0
-        if end is not None and end <= effective_start:
-            raise AppError("SEGMENT_INVALID", f"{_segment_name(kind)}的 End 必须晚于 Start。", 422)
-        if end is not None:
-            span = end - effective_start
-            minimum, maximum = limits[kind]
-            if not minimum <= span <= maximum:
-                raise AppError("SEGMENT_INVALID", f"{_segment_name(kind)}时长必须在 {minimum // 1000}–{maximum // 1000} 秒之间。", 422)
-        for value in (start, end):
-            if duration_ms is not None and value is not None and value > duration_ms + 1_000:
-                raise AppError("SEGMENT_INVALID", f"{_segment_name(kind)}的时间超过媒体时长。", 422)
-        interval_end = end if end is not None else (duration_ms or 21_600_000)
-        grouped.setdefault(kind, []).append((effective_start, interval_end))
-        output.append({"type": kind, "start_ms": start, "end_ms": end})
-    if not output:
+    segment = body.segment
+    start, end, kind = segment.start_ms, segment.end_ms, segment.type
+    if start is None and end is None:
         raise AppError("SEGMENT_INVALID", "没有可提交的分段。", 422)
-    for kind, intervals in grouped.items():
-        intervals.sort()
-        if any(current[0] < previous[1] for previous, current in zip(intervals, intervals[1:])):
-            raise AppError("SEGMENT_INVALID", f"{_segment_name(kind)}区间不能互相重叠。", 422)
-    return output
+    if kind in {"intro", "recap"} and end is None:
+        raise AppError("SEGMENT_INVALID", f"{_segment_name(kind)}的 End 为必填项。", 422)
+    if kind in {"credits", "preview"} and start is None:
+        raise AppError("SEGMENT_INVALID", f"{_segment_name(kind)}的 Start 为必填项。", 422)
+    effective_start = start or 0
+    if end is not None and end <= effective_start:
+        raise AppError("SEGMENT_INVALID", f"{_segment_name(kind)}的 End 必须晚于 Start。", 422)
+    if end is not None:
+        span = end - effective_start
+        minimum, maximum = limits[kind]
+        if not minimum <= span <= maximum:
+            raise AppError("SEGMENT_INVALID", f"{_segment_name(kind)}时长必须在 {minimum // 1000}–{maximum // 1000} 秒之间。", 422)
+    for value in (start, end):
+        if duration_ms is not None and value is not None and value > duration_ms + 1_000:
+            raise AppError("SEGMENT_INVALID", f"{_segment_name(kind)}的时间超过媒体时长。", 422)
+    return {"type": kind, "start_ms": start, "end_ms": end}
 
 
 def _segment_name(kind: str) -> str:

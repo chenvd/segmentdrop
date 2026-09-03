@@ -9,8 +9,7 @@ const state = {
   view: "home",
   sessionsBusy: false,
   detail: null,
-  originalSegments: null,
-  formSegments: null,
+  formSegment: null,
   settingsLoaded: false,
 };
 
@@ -188,23 +187,13 @@ async function openDetail(sessionId, itemId) {
   try {
     const detail = await api(`/api/sessions/${encodeURIComponent(sessionId)}?item_id=${encodeURIComponent(itemId)}`);
     state.detail = detail;
-    state.originalSegments = normalizeSegments(detail.segments);
-    state.formSegments = clone(state.originalSegments);
+    state.formSegment = { type: "intro", start_ms: null, end_ms: null };
     renderDetail();
     $("#editor-loading").hidden = true;
     $("#editor-content").hidden = false;
   } catch (error) {
     $("#editor-loading").innerHTML = `<h3>${escapeHtml(error.message)}</h3><p>返回正在播放页面后可以重新选择设备。</p><button class="secondary" data-view="home">返回正在播放</button>`;
   }
-}
-
-function normalizeSegments(input) {
-  const output = {};
-  Object.keys(SEGMENTS).forEach(kind => {
-    output[kind] = (input?.[kind] || []).map(value => ({ start_ms: value.start_ms ?? null, end_ms: value.end_ms ?? null }));
-    if (!output[kind].length) output[kind].push({ start_ms: null, end_ms: null });
-  });
-  return output;
 }
 
 function renderDetail() {
@@ -217,77 +206,80 @@ function renderDetail() {
   $("#detail-episode").textContent = detail.item_type === "episode" ? `S${pad(detail.season)} E${pad(detail.episode)} · ${detail.episode_title || ""}` : "";
   $("#detail-meta").textContent = `TMDb ${detail.tmdb_id} · Emby 条目 ${detail.item_id}`;
   $("#timeline-duration").textContent = formatClock(detail.duration_ms);
+  updateTypeButtons();
+  renderSegmentEditor();
   renderTimeline();
-  renderSegmentCards();
 }
 
 function renderTimeline() {
   const duration = state.detail?.duration_ms;
-  const timeline = $("#timeline");
+  const { type } = state.formSegment;
+  const inputs = $$(".time-input", $("#segments"));
+  const readable = inputs.length === 2 && inputs.every(input => !input.value.trim() || parseTime(input.value) != null);
+  const canPreview = requiredFieldsPresent() && readable;
+  const start = inputs[0]?.value.trim() ? parseTime(inputs[0].value) : 0;
+  const end = inputs[1]?.value.trim() ? parseTime(inputs[1].value) : duration;
   if (!duration) {
     $("#timeline-panel").hidden = true;
     return;
   }
   $("#timeline-panel").hidden = false;
-  const pieces = [];
-  for (const [kind, intervals] of Object.entries(state.formSegments)) {
-    for (const interval of intervals) {
-      if (interval.start_ms == null && interval.end_ms == null) continue;
-      const start = interval.start_ms ?? 0;
-      const end = interval.end_ms ?? duration;
-      pieces.push(`<span class="${kind}" style="left:${Math.max(0, start / duration * 100)}%;width:${Math.max(.2, (end - start) / duration * 100)}%" title="${SEGMENTS[kind].name}"></span>`);
-    }
-  }
-  timeline.innerHTML = pieces.join("");
+  $("#timeline").innerHTML = canPreview
+    ? `<span class="${type}" style="left:${Math.max(0, start / duration * 100)}%;width:${Math.max(.2, (end - start) / duration * 100)}%" title="${SEGMENTS[type].name}"></span>`
+    : "";
+  $("#timeline-label").textContent = `${SEGMENTS[type].name}提交预览`;
+  $("#timeline-legend").innerHTML = `<span><i style="--color:var(--${type === "intro" ? "orange" : type === "recap" ? "blue" : type === "credits" ? "purple" : "teal"})"></i>${SEGMENTS[type].name}</span>`;
 }
 
-function renderSegmentCards() {
-  $("#segments").innerHTML = Object.entries(SEGMENTS).map(([kind, config]) => {
-    const intervals = state.formSegments[kind];
-    const hasValue = intervals.some(interval => interval.start_ms != null || interval.end_ms != null);
-    return `<article class="segment-card ${kind}" data-kind="${kind}">
-      <div class="segment-title"><h3><i></i>${config.name}</h3><button class="clear-segment" ${hasValue ? "" : "hidden"}>清空</button></div>
-      <div class="intervals">${intervals.map((interval, index) => intervalTemplate(kind, interval, index, intervals.length)).join("")}</div>
-      <button class="add-interval">＋ 添加区间</button>
-    </article>`;
-  }).join("");
-  updateSubmitCount();
+function renderSegmentEditor() {
+  const { type, ...interval } = state.formSegment;
+  const config = SEGMENTS[type];
+  const hasValue = interval.start_ms != null || interval.end_ms != null;
+  $("#segments").innerHTML = `<article class="segment-card ${type}" data-kind="${type}">
+    <div class="segment-title"><h3><i></i>${config.name}</h3><button class="clear-segment" ${hasValue ? "" : "hidden"}>清空时间</button></div>
+    ${timeBlock(type, "start_ms", interval.start_ms, config.startOptional)}
+    ${timeBlock(type, "end_ms", interval.end_ms, config.endOptional)}
+  </article>`;
+  updateSubmitButton();
 }
 
-function intervalTemplate(kind, interval, index, count) {
-  const config = SEGMENTS[kind];
-  return `<div class="interval" data-index="${index}">
-    <div class="interval-head"><span>区间 ${index + 1}</span>${count > 1 ? `<button class="remove-interval">删除区间</button>` : ""}</div>
-    ${timeBlock(kind, index, "start_ms", interval.start_ms, config.startOptional)}
-    ${timeBlock(kind, index, "end_ms", interval.end_ms, config.endOptional)}
-  </div>`;
-}
-
-function timeBlock(kind, index, field, value, optional) {
+function timeBlock(kind, field, value, optional) {
   const label = field === "start_ms" ? "START" : "END";
   return `<div class="time-block">
     <div class="time-label"><span>${label}</span><span>${optional ? "可为空" : "必填"}</span></div>
-    <div class="time-row"><input class="time-input" value="${value == null ? "" : formatTime(value)}" ${optional ? 'placeholder="可为空"' : ""} inputmode="decimal" data-kind="${kind}" data-index="${index}" data-field="${field}" aria-label="${SEGMENTS[kind].name}${label}"><button class="capture">获取</button></div>
+    <div class="time-row"><input class="time-input" value="${value == null ? "" : formatTime(value)}" ${optional ? 'placeholder="可为空"' : ""} inputmode="decimal" data-field="${field}" aria-label="${SEGMENTS[kind].name}${label}"><button class="capture">获取进度</button></div>
     <div class="adjust-row"><button class="adjust" data-delta="-1000">−1s</button><button class="adjust" data-delta="-100">−0.1s</button><button class="adjust" data-delta="100">+0.1s</button><button class="adjust" data-delta="1000">+1s</button></div>
   </div>`;
+}
+
+$("#segment-type-picker").addEventListener("click", event => {
+  const button = event.target.closest("button[data-kind]");
+  if (!button || button.dataset.kind === state.formSegment.type) return;
+  if (!syncAllInputs()) {
+    showToast("时间格式有误", "请先修正标红的时间输入框");
+    return;
+  }
+  state.formSegment.type = button.dataset.kind;
+  updateTypeButtons();
+  renderSegmentEditor();
+  renderTimeline();
+});
+
+function updateTypeButtons() {
+  $$("button[data-kind]", $("#segment-type-picker")).forEach(button => {
+    const active = button.dataset.kind === state.formSegment.type;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-pressed", String(active));
+  });
 }
 
 $("#segments").addEventListener("click", async event => {
   const card = event.target.closest(".segment-card");
   if (!card) return;
-  const kind = card.dataset.kind;
-  const intervalElement = event.target.closest(".interval");
-  const index = intervalElement ? Number(intervalElement.dataset.index) : null;
   if (event.target.closest(".clear-segment")) {
-    state.formSegments[kind] = [{ start_ms: null, end_ms: null }];
-    renderSegmentCards(); renderTimeline(); showToast(`已清空${SEGMENTS[kind].name}`, "本次提交将忽略这些区间");
-  } else if (event.target.closest(".add-interval")) {
-    state.formSegments[kind].push({ start_ms: null, end_ms: null });
-    renderSegmentCards();
-  } else if (event.target.closest(".remove-interval")) {
-    state.formSegments[kind].splice(index, 1);
-    if (!state.formSegments[kind].length) state.formSegments[kind].push({ start_ms: null, end_ms: null });
-    renderSegmentCards(); renderTimeline();
+    state.formSegment.start_ms = null;
+    state.formSegment.end_ms = null;
+    renderSegmentEditor(); renderTimeline(); showToast("已清空时间", "请选择或获取新的播放位置");
   } else if (event.target.closest(".adjust")) {
     const input = $(".time-input", event.target.closest(".time-block"));
     const current = readInput(input, false) ?? 0;
@@ -321,9 +313,12 @@ function readInput(input, flagInvalid = true) {
 
 function updateModelFromInput(input, strict) {
   const value = readInput(input, strict);
-  if (input.value.trim() && value == null) return false;
-  state.formSegments[input.dataset.kind][Number(input.dataset.index)][input.dataset.field] = value;
-  updateSubmitCount(); renderTimeline(); updateClearButton(input.dataset.kind);
+  if (input.value.trim() && value == null) {
+    updateSubmitButton(); renderTimeline(); updateClearButton();
+    return false;
+  }
+  state.formSegment[input.dataset.field] = value;
+  updateSubmitButton(); renderTimeline(); updateClearButton();
   return true;
 }
 
@@ -333,10 +328,10 @@ function setInput(input, value) {
   updateModelFromInput(input, true);
 }
 
-function updateClearButton(kind) {
-  const card = $(`.segment-card[data-kind="${kind}"]`);
+function updateClearButton() {
+  const card = $(".segment-card", $("#segments"));
   if (!card) return;
-  $(".clear-segment", card).hidden = !state.formSegments[kind].some(interval => interval.start_ms != null || interval.end_ms != null);
+  $(".clear-segment", card).hidden = !$$('.time-input', card).some(input => input.value.trim());
 }
 
 async function capturePosition(button, input) {
@@ -345,7 +340,7 @@ async function capturePosition(button, input) {
     const detail = state.detail;
     const data = await api(`/api/sessions/${encodeURIComponent(detail.session_id)}/position?item_id=${encodeURIComponent(detail.item_id)}`);
     setInput(input, data.position_ms);
-    showToast("已获取最新播放位置", `${data.device_name} · ${formatTime(data.position_ms)}`);
+    showToast("已获取播放进度", `${data.device_name} · ${formatTime(data.position_ms)}`);
   } catch (error) {
     showToast("获取失败", error.message);
   } finally {
@@ -353,30 +348,30 @@ async function capturePosition(button, input) {
   }
 }
 
-$("#reset-all").addEventListener("click", () => {
-  state.formSegments = clone(state.originalSegments);
-  renderSegmentCards(); renderTimeline(); showToast("已恢复 Emby 原始分段");
-});
+function updateSubmitButton() {
+  if (!state.formSegment) return;
+  const button = $("#submit-btn");
+  button.textContent = `提交${state.detail?.item_type === "episode" ? "本集" : "本片"}${SEGMENTS[state.formSegment.type].name}`;
+  button.disabled = !requiredFieldsPresent();
+  button.title = button.disabled ? "请填写必填时间" : "";
+}
 
-function updateSubmitCount() {
-  if (!state.formSegments) return;
-  let count = 0;
-  for (const [kind, intervals] of Object.entries(state.formSegments)) {
-    count += intervals.filter(interval => kind === "intro" || kind === "recap" ? interval.end_ms != null : interval.start_ms != null).length;
+function requiredFieldsPresent() {
+  if (!state.formSegment) return false;
+  const { type, start_ms: start, end_ms: end } = state.formSegment;
+  const inputs = $$(".time-input", $("#segments"));
+  if (inputs.length === 2) {
+    const required = type === "intro" || type === "recap" ? inputs[1] : inputs[0];
+    return Boolean(required.value.trim() && parseTime(required.value) != null);
   }
-  $("#submit-btn").textContent = `提交${state.detail?.item_type === "episode" ? "本集" : "本片"}分段 · ${count} 项`;
+  return type === "intro" || type === "recap" ? end != null : start != null;
 }
 
 $("#submit-btn").addEventListener("click", async event => {
   const button = event.currentTarget;
   if (!syncAllInputs()) return showToast("时间格式有误", "请检查标红的时间输入框");
-  const segments = [];
-  for (const [kind, intervals] of Object.entries(state.formSegments)) {
-    intervals.forEach(interval => {
-      if (interval.start_ms != null || interval.end_ms != null) segments.push({ type: kind, ...interval });
-    });
-  }
-  if (!segments.length) return showToast("没有可提交的分段");
+  const segment = { ...state.formSegment };
+  if (segment.start_ms == null && segment.end_ms == null) return showToast("还没有填写分段时间");
   const detail = state.detail;
   button.disabled = true;
   button.textContent = "正在提交…";
@@ -385,14 +380,14 @@ $("#submit-btn").addEventListener("click", async event => {
       session_id: detail.session_id,
       item_id: detail.item_id,
       media: { type: detail.item_type, tmdb_id: detail.tmdb_id, season: detail.season, episode: detail.episode, duration_ms: detail.duration_ms },
-      segments,
+      segment,
     }) });
-    showResults(data.results);
+    showResult(data.result);
   } catch (error) {
     showToast("提交失败", error.message);
   } finally {
     button.disabled = false;
-    updateSubmitCount();
+    updateSubmitButton();
   }
 });
 
@@ -400,10 +395,10 @@ function syncAllInputs() {
   return $$(".time-input", $("#segments")).map(input => updateModelFromInput(input, true)).every(Boolean);
 }
 
-function showResults(results) {
-  const success = results.filter(result => ["success", "duplicate"].includes(result.status)).length;
-  $("#result-summary").textContent = `已处理 ${results.length} 个区间，${success} 项成功或已存在。`;
-  $("#result-list").innerHTML = results.map(result => `<div class="result-item ${escapeHtml(result.status)}"><b>${SEGMENTS[result.type]?.name || result.type}</b><span>${escapeHtml(result.message)}</span></div>`).join("");
+function showResult(result) {
+  const success = ["success", "duplicate"].includes(result.status);
+  $("#result-summary").textContent = success ? "这个分段已成功提交或已存在。" : "这个分段未能提交。";
+  $("#result-list").innerHTML = `<div class="result-item ${escapeHtml(result.status)}"><b>${SEGMENTS[result.type]?.name || result.type}</b><span>${escapeHtml(result.message)}</span></div>`;
   $("#result-sheet").classList.add("show");
 }
 
@@ -483,8 +478,6 @@ function formatClock(value) {
 }
 
 function pad(value) { return String(value ?? 0).padStart(2, "0"); }
-function clone(value) { return JSON.parse(JSON.stringify(value)); }
-
 document.addEventListener("visibilitychange", () => { if (!document.hidden && state.view === "home") refreshSessions(); });
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => navigator.serviceWorker.register("/sw.js").catch(() => {}));

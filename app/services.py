@@ -7,7 +7,7 @@ import httpx
 
 from .config import EmbySettings, TheIntroDBSettings
 from .errors import AppError
-from .segments import parse_emby_segments, ticks_to_ms
+from .segments import ticks_to_ms
 
 
 def provider_id(item: dict[str, Any], name: str) -> str | None:
@@ -114,7 +114,6 @@ class EmbyService:
             "tmdb_id": int(tmdb),
             "duration_ms": duration_ms,
             "poster_url": f"/api/images/{item_id}/primary?session_id={session_id}",
-            "segments": parse_emby_segments(item.get("Chapters")),
         }
 
     async def position(self, settings: EmbySettings, session_id: str, item_id: str) -> dict[str, Any]:
@@ -150,7 +149,7 @@ class EmbyService:
             settings,
             "GET",
             f"Users/{user_id}/Items/{item_id}",
-            params={"Fields": "ProviderIds,Chapters,RunTimeTicks,ProductionYear"},
+            params={"Fields": "ProviderIds,RunTimeTicks,ProductionYear"},
         )
         return response.json()
 
