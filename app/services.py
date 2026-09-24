@@ -73,11 +73,15 @@ class EmbyService:
             output.append(self._session_view(session, item, position_ms, duration_ms))
         return output
 
-    async def session_detail(self, settings: EmbySettings, session_id: str, item_id: str) -> dict[str, Any]:
-        session = await self._validated_session(settings, session_id, item_id)
-        now_playing = session["NowPlayingItem"]
+    async def session_detail(
+        self, settings: EmbySettings, session_id: str, item_id: str, *, require_current: bool = True
+    ) -> dict[str, Any]:
+        session = await self._validated_session(settings, session_id, item_id, require_current=require_current)
+        now_playing = session.get("NowPlayingItem") or {}
         user_id = str(session.get("UserId") or "")
         item = await self._item(settings, user_id, item_id)
+        if str(item.get("Id")) != item_id:
+            raise AppError("SESSION_ITEM_CHANGED", "无法确认所选媒体，请重新打开详情页。", 409)
         item_type = item.get("Type")
         if item_type not in {"Movie", "Episode"}:
             raise AppError("TMDB_ID_MISSING", "当前媒体不是可提交的电影或剧集。", 422)
@@ -131,16 +135,18 @@ class EmbyService:
     async def image(self, settings: EmbySettings, item_id: str) -> httpx.Response:
         return await self.request(settings, "GET", f"Items/{item_id}/Images/Primary", params={"maxWidth": 500, "quality": 85})
 
-    async def _validated_session(self, settings: EmbySettings, session_id: str, item_id: str) -> dict[str, Any]:
+    async def _validated_session(
+        self, settings: EmbySettings, session_id: str, item_id: str, *, require_current: bool = True
+    ) -> dict[str, Any]:
         data = (await self.request(settings, "GET", "Sessions", params={"Id": session_id})).json()
         sessions = data if isinstance(data, list) else []
         if not sessions:
             raise AppError("SESSION_NOT_FOUND", "当前设备已经停止播放该影片。", 404)
         session = sessions[0]
         item = session.get("NowPlayingItem")
-        if not item:
+        if require_current and not item:
             raise AppError("SESSION_STOPPED", "当前设备已经停止播放该影片。", 409)
-        if str(item.get("Id")) != str(item_id):
+        if require_current and str(item.get("Id")) != str(item_id):
             raise AppError("SESSION_ITEM_CHANGED", "当前播放内容已经改变，请返回正在播放页面重新选择。", 409)
         return session
 

@@ -153,7 +153,9 @@ async def test_theintrodb(body: TheIntroDBSettingsInput, request: Request) -> di
 @app.post("/api/submit")
 async def submit(body: SubmitInput, request: Request) -> dict[str, Any]:
     settings = store.load()
-    detail = await request.app.state.emby.session_detail(settings.emby, body.session_id, body.item_id)
+    detail = await request.app.state.emby.session_detail(
+        settings.emby, body.session_id, body.item_id, require_current=False
+    )
     _validate_identity(detail, body)
     segment = _validate_segment(body, detail.get("duration_ms"))
     external: dict[str, Any] = {
